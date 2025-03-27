@@ -16,12 +16,15 @@ class QuotesSpider(scrapy.Spider):
             meta=dict(
                 playwright=True,
                 playwright_include_page=True,
-                playwright_page_methods=[PageMethod("waitForSelector", "div.quote")],
+                playwright_page_methods=[PageMethod("wait_for_selector", "div.quote")],
                 errback=self.errback,
             ),
         )
 
-    def parse(self, response):
+    async def parse(self, response):
+        page = response.meta["playwright_page"]
+        await page.close()
+
         for quote in response.css("div.quote"):
             quote_item = QuoteItem()
             quote_item["text"] = quote.css("span.text::text").get()
@@ -29,6 +32,23 @@ class QuotesSpider(scrapy.Spider):
             quote_item["tags"] = quote.css("div.tags a.tag::text").getall()
 
             yield quote_item
+
+        next_page = response.css('li.next a::attr("href")').get()
+
+        if next_page is not None:
+            next_page_url = "https://quotes.toscrape.com" + next_page
+            # yield response.follow(next_page_url, self.parse)
+            yield scrapy.Request(
+                next_page_url,
+                meta=dict(
+                    playwright=True,
+                    playwright_include_page=True,
+                    playwright_page_methods=[
+                        PageMethod("wait_for_selector", "div.quote")
+                    ],
+                    errback=self.errback,
+                ),
+            )
 
     async def errback(self, failure):
         page = failure.request.meta["playwright_page"]
