@@ -9,14 +9,21 @@ class QuotesSpider(scrapy.Spider):
     # start_urls = ["http://quotes.toscrape.com/"]
 
     def start_requests(self):
-        url = "https://quotes.toscrape.com/js/"
+        url = "https://quotes.toscrape.com/scroll"
         # yield scrapy.Request(url, meta={"playwright": True})
         yield scrapy.Request(
             url,
             meta=dict(
                 playwright=True,
                 playwright_include_page=True,
-                playwright_page_methods=[PageMethod("wait_for_selector", "div.quote")],
+                playwright_page_methods=[
+                    PageMethod("wait_for_selector", "div.quote"),
+                    PageMethod(
+                        "evaluate", "window.scrollBy(0, document.body.scrollHeight)"
+                    ),
+                    PageMethod("wait_for_selector", "div.quote:nth-child(11)"),
+                    PageMethod("wait_for_timeout", 1000),
+                ],
                 errback=self.errback,
             ),
         )
@@ -33,22 +40,22 @@ class QuotesSpider(scrapy.Spider):
 
             yield quote_item
 
-        next_page = response.css('li.next a::attr("href")').get()
+        # next_page = response.css('li.next a::attr("href")').get()
 
-        if next_page is not None:
-            next_page_url = "https://quotes.toscrape.com" + next_page
-            # yield response.follow(next_page_url, self.parse)
-            yield scrapy.Request(
-                next_page_url,
-                meta=dict(
-                    playwright=True,
-                    playwright_include_page=True,
-                    playwright_page_methods=[
-                        PageMethod("wait_for_selector", "div.quote")
-                    ],
-                    errback=self.errback,
-                ),
-            )
+        # if next_page is not None:
+        #     next_page_url = "https://quotes.toscrape.com" + next_page
+        #     # yield response.follow(next_page_url, self.parse)
+        #     yield scrapy.Request(
+        #         next_page_url,
+        #         meta=dict(
+        #             playwright=True,
+        #             playwright_include_page=True,
+        #             playwright_page_methods=[
+        #                 PageMethod("wait_for_selector", "div.quote")
+        #             ],
+        #             errback=self.errback,
+        #         ),
+        #     )
 
     async def errback(self, failure):
         page = failure.request.meta["playwright_page"]
